@@ -1,0 +1,39 @@
+#!/bin/bash
+
+DOCKER_COMPOSE="/usr/local/bin/docker-compose"
+
+PARENT_PID=$(ps -o ppid= -p $$)
+
+# Перебор всех родительских процессов и поиск docker-compose.sh
+while :;
+do
+    if [[ -n "$(ps -o args= -p ${PARENT_PID} | grep "docker-compose\.sh")" ]]
+    then
+        # Вызов docker-compose, если команда вызвана из docker-compose.sh
+        ${DOCKER_COMPOSE} $@
+        exit $?
+    fi
+    PARENT_PID=$(ps -o ppid= -p ${PARENT_PID} | grep -Po "\d+")
+
+    if [[ $? -ne 0 ]]; then
+        echo "Error"
+        exit;
+    fi
+
+    if [[ "${PARENT_PID}" == "0" ]]
+    then
+        break;
+    fi
+done
+
+# Попытка выполнить docker-compose.sh в текущей директории, если не найден в родительских процессах
+if [[ -f "./docker-compose.sh" &&  -x "./docker-compose.sh" ]]
+then
+    echo "Redirect to docker-compose.sh"
+    echo ""
+    ./docker-compose.sh $@
+    exit $?
+else
+    ${DOCKER_COMPOSE} $@
+    exit $?
+fi
